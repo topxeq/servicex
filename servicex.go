@@ -197,7 +197,7 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 		req.ParseForm()
 	}
 
-	reqT := tk.GetFormValueWithDefaultValue(req, "req", "")
+	reqT := strings.ToLower(tk.GetFormValueWithDefaultValue(req, "req", ""))
 
 	if res != nil {
 		res.Header().Set("Access-Control-Allow-Origin", "*")
@@ -217,7 +217,7 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 			return tk.GenerateJSONPResponse("success", tk.IntToStr(a[5]), req)
 		}
 
-	case "getDebug":
+	case "getdebug":
 		{
 			res.Header().Set("Content-Type", "text/plain;charset=utf-8")
 
@@ -226,10 +226,17 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 			return tk.GenerateJSONPResponse("success", tk.GetDebug(), req)
 		}
 
-	case "clearDebug":
+	case "cleardebug":
 		{
 			tk.ClearDebug()
 			return tk.GenerateJSONPResponse("success", "", req)
+		}
+
+	case "md5":
+		{
+			strT := tk.GetFormValueWithDefaultValue(req, "text", "")
+
+			return tk.GenerateJSONPResponse("success", tk.MD5Encrypt(strT), req)
 		}
 
 	default:
