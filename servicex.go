@@ -13,7 +13,7 @@ import (
 	"github.com/kardianos/service"
 	"github.com/topxeq/tk"
 
-	"golang.org/x/net/websocket"
+	"github.com/gorilla/websocket"
 )
 
 var versionG string = "0.01a"
@@ -86,10 +86,23 @@ func stopWork() {
 	exit <- struct{}{}
 }
 
-func webSocketHandler(conn *websocket.Conn) {
-	tk.Pl("conn: %s->%s\n", conn.RemoteAddr().String(), conn.LocalAddr().String())
+func checkOrigin(r *http.Request) bool {
+	return true
+}
 
-	reqT := conn.Request()
+var upgrader = websocket.Upgrader{CheckOrigin: checkOrigin}
+
+func webSocketHandler(w http.ResponseWriter, r *http.Request) {
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		tk.Pl("upgrade: %v", err)
+		return
+	}
+	defer c.Close()
+
+	tk.Pl("conn: %s\n", r.RemoteAddr)
+
+	reqT := r
 
 	reqT.ParseForm()
 
@@ -100,7 +113,7 @@ func webSocketHandler(conn *websocket.Conn) {
 	var errT error
 
 	if userT == "" {
-		if errT = websocket.Message.Send(conn, "命令格式错误"); errT != nil {
+		if errT = c.WriteMessage(websocket.TextMessage, []byte("命令格式错误")); errT != nil {
 			tk.Pl("send err: %v", errT.Error())
 			return
 		}
@@ -110,7 +123,16 @@ func webSocketHandler(conn *websocket.Conn) {
 	for {
 		var cmdLineT string
 
-		errT = websocket.Message.Receive(conn, &cmdLineT)
+		messageTypeT, messageT, errT := c.ReadMessage()
+
+		if errT != nil {
+			tk.Pl("receive error: %v", errT.Error())
+			return
+		}
+
+		cmdLineT = string(messageT)
+
+		tk.Pl("Received: (%v) %v", messageTypeT, cmdLineT)
 
 		if errT != nil {
 			tk.Pl("receive error: %v", errT.Error())
@@ -124,7 +146,7 @@ func webSocketHandler(conn *websocket.Conn) {
 		errT = json.Unmarshal([]byte(cmdLineT), cmdListT)
 
 		if errT != nil {
-			if errT = websocket.Message.Send(conn, "命令格式错误"); errT != nil {
+			if errT = c.WriteMessage(websocket.TextMessage, []byte("命令格式错误")); errT != nil {
 				tk.Pl("send err: %v", errT.Error())
 				return
 			}
@@ -132,7 +154,7 @@ func webSocketHandler(conn *websocket.Conn) {
 			continue
 		}
 
-		if errT = websocket.Message.Send(conn, tk.Spr("无效的命令：%v", cmdLineT)); errT != nil {
+		if errT = c.WriteMessage(websocket.TextMessage, []byte(tk.Spr("无效的命令：%v", cmdLineT))); errT != nil {
 			tk.Pl("send err: %v", errT.Error())
 			return
 		}
@@ -148,7 +170,7 @@ func startWebSocketServer(portA string) {
 
 	tk.LogWithTimeCompact("trying startWebSocketServer, port: %v", portA)
 
-	http.Handle("/wapi", websocket.Handler(webSocketHandler))
+	http.HandleFunc("/wapi", webSocketHandler)
 
 	err := http.ListenAndServe(":"+portA, nil)
 	if err != nil {
@@ -178,6 +200,8 @@ func startHttpServer(portA string) {
 
 func startHttpsServer(portA string) {
 	plByMode("https port: %v", portA)
+	tk.LogWithTimeCompact("trying startHttpsServer, port: %v", portA)
+
 	err := http.ListenAndServeTLS(":"+portA, filepath.Join(servicexBasePathG, "server.crt"), filepath.Join(servicexBasePathG, "server.key"), nil)
 	if err != nil {
 		plByMode("ListenAndServeHttps: %v", err.Error())
@@ -541,7 +565,7 @@ func main() {
 	}
 
 	if len(os.Args) < 2 {
-		fmt.Printf("servicex V%v is in service(server) mode. Running the application without any arguments will cause it in service mode.\n", versionG)
+		plByMode("servicex V%v is in service(server) mode. Running the application without any arguments will cause it in service mode.\n", versionG)
 		serviceModeG = true
 
 		s := initSvc()
@@ -556,6 +580,7 @@ func main() {
 			tk.LogWithTimeCompact("Service \"%s\" failed to run.", (*s).String())
 		}
 
+		tk.Pl("err: %#v", err.Error())
 		return
 	}
 
