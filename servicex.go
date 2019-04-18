@@ -263,6 +263,11 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 			return tk.GenerateJSONPResponse("success", tk.MD5Encrypt(strT), req)
 		}
 
+	case "showip":
+		{
+			return tk.GenerateJSONPResponse("success", req.RemoteAddr, req)
+		}
+
 	default:
 		return tk.GenerateJSONPResponse("fail", tk.Spr("unknown request: %v", req), req)
 	}
@@ -413,6 +418,12 @@ func runCmd(cmdLineA []string) {
 			tk.Pl("servicexBasePathG: %v", servicexBasePathG)
 		}
 		break
+	case "go":
+		go doWork()
+
+		for {
+			tk.SleepSeconds(1)
+		}
 	case "", "run":
 		s := initSvc()
 
@@ -423,7 +434,7 @@ func runCmd(cmdLineA []string) {
 
 		err := (*s).Run()
 		if err != nil {
-			tk.LogWithTimeCompact("Service \"%s\" failed to run.", (*s).String())
+			tk.LogWithTimeCompact("Service \"%s\" failed to run: %v.", (*s).String(), err)
 		}
 	case "installonly":
 		s := initSvc()
