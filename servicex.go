@@ -225,6 +225,7 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 
 	if res != nil {
 		res.Header().Set("Access-Control-Allow-Origin", "*")
+		res.Header().Set("Access-Control-Allow-Headers", "*")
 		res.Header().Set("Content-Type", "text/json;charset=utf-8")
 	}
 
@@ -262,6 +263,55 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 
 			return tk.GenerateJSONPResponse("success", tk.MD5Encrypt(strT), req)
 		}
+
+	case "requestinfo":
+		{
+			rs := tk.Spr("%#v", req)
+
+			return tk.GenerateJSONPResponse("success", rs, req)
+		}
+
+	case "postr":
+		valueT := tk.GetFormValueWithDefaultValue(req, "value", "")
+
+		if tk.IsEmptyTrim(valueT) {
+			return tk.GenerateJSONPResponse("fail", "empty value", req)
+		}
+
+		postListT, errT := tk.ParseCommandLine(valueT)
+
+		if errT != nil {
+			return tk.GenerateJSONPResponse("fail", tk.Spr("failed to parse parameters: %v", errT.Error()), req)
+		}
+
+		urlT := tk.GetParameterByIndexWithDefaultValue(postListT, 1, "")
+
+		if tk.IsEmptyTrim(urlT) {
+			return tk.GenerateJSONPResponse("fail", "URL empty", req)
+		}
+
+		postDataT := tk.GetSwitchWithDefaultValue(postListT, "-data=", "")
+
+		headersStrT := tk.GetSwitchWithDefaultValue(postListT, "-header=", "")
+
+		var mssT map[string]string
+
+		if !tk.IsEmptyTrim(headersStrT) {
+			errT := json.Unmarshal([]byte(headersStrT), &mssT)
+
+			if errT != nil {
+				return tk.GenerateJSONPResponse("fail", tk.Spr("failed to parse headers: %v", errT.Error()), req)
+			}
+
+		}
+
+		rs, errT := tk.PostRequestBytesWithMSSHeaderX(urlT, []byte(postDataT), mssT, 15)
+
+		if errT != nil {
+			return tk.GenerateJSONPResponse("fail", tk.Spr("error server response: %v, urlT: %v", errT.Error(), urlT), req)
+		}
+
+		return tk.GenerateJSONPResponse("success", tk.Spr("%v", string(rs)), req)
 
 	case "showip":
 		{
