@@ -272,6 +272,8 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 		}
 
 	case "postr":
+		// postr http://getx.topget.org:7468/api -data=req=get&code=xq -header=`{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"}`
+
 		valueT := tk.GetFormValueWithDefaultValue(req, "value", "")
 
 		if tk.IsEmptyTrim(valueT) {
