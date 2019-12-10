@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,6 +15,7 @@ import (
 	"github.com/kardianos/service"
 	"github.com/topxeq/tk"
 
+	"github.com/beevik/etree"
 	"github.com/gorilla/websocket"
 )
 
@@ -264,6 +267,27 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 			return tk.GenerateJSONPResponse("success", tk.MD5Encrypt(strT), req)
 		}
 
+	case "base64":
+		{
+			strT := tk.GetFormValueWithDefaultValue(req, "text", "")
+
+			rs := base64.StdEncoding.EncodeToString([]byte(strT))
+
+			return tk.GenerateJSONPResponse("success", rs, req)
+		}
+
+	case "unbase64":
+		{
+			strT := tk.GetFormValueWithDefaultValue(req, "text", "")
+
+			dataT, errT := base64.StdEncoding.DecodeString(strT)
+			if errT != nil {
+				return tk.GenerateJSONPResponse("success", strT, req)
+			}
+
+			return tk.GenerateJSONPResponse("success", string(dataT), req)
+		}
+
 	case "requestinfo":
 		{
 			rs := tk.Spr("%#v", req)
@@ -320,9 +344,47 @@ func doJapi(res http.ResponseWriter, req *http.Request) string {
 			return tk.GenerateJSONPResponse("success", req.RemoteAddr, req)
 		}
 
+	case "validatexml":
+		{
+			valueT := tk.GetFormValueWithDefaultValue(req, "value", "")
+
+			if tk.IsEmptyTrim(valueT) {
+				return tk.GenerateJSONPResponse("fail", "empty value", req)
+			}
+
+			var bufT interface{}
+
+			errT := xml.Unmarshal([]byte(valueT), &bufT)
+
+			if errT != nil {
+				return tk.GenerateJSONPResponse("fail", errT.Error(), req)
+			}
+
+			treeT := etree.NewDocument()
+
+			errT = treeT.ReadFromString(valueT)
+
+			if errT != nil {
+				return tk.GenerateJSONPResponse("fail", errT.Error(), req)
+			}
+
+			treeT.Indent(2)
+
+			xmlT, errT := treeT.WriteToString()
+
+			if errT != nil {
+				return tk.GenerateJSONPResponse("fail", tk.Spr("failed to re-encode: %v", errT.Error()), req)
+			}
+
+			return tk.GenerateJSONPResponse("success", xmlT, req)
+		}
+
 	default:
 		return tk.GenerateJSONPResponse("fail", tk.Spr("unknown request: %v", req), req)
 	}
+
+	return tk.GenerateJSONPResponse("fail", tk.Spr("unknown request: %v", req), req)
+
 }
 
 func japiHandler(w http.ResponseWriter, req *http.Request) {
